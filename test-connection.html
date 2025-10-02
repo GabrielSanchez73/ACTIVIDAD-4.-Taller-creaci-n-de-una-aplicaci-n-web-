@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test de Conexión API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .endpoint {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .success { border-color: #4caf50; background-color: #f1f8e9; }
+        .error { border-color: #f44336; background-color: #ffebee; }
+        .loading { border-color: #ff9800; background-color: #fff3e0; }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #1976d2; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .status { font-weight: bold; }
+        .url { font-family: monospace; font-size: 0.9em; color: #666; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test de Conexión a REST Countries API</h1>
+    
+    <div class="test-container">
+        <h2>Endpoints de Prueba</h2>
+        <p>Esta página te ayuda a probar qué endpoints funcionan desde GitHub Pages.</p>
+        <button onclick="testAllEndpoints()">🔍 Probar Todos los Endpoints</button>
+        <button onclick="clearResults()">🗑️ Limpiar Resultados</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const API_ENDPOINTS = [
+            {
+                name: 'API Original',
+                url: 'https://restcountries.com/v3.1/all',
+                description: 'Endpoint original de REST Countries'
+            },
+            {
+                name: 'AllOrigins Proxy',
+                url: 'https://api.allorigins.win/raw?url=https://restcountries.com/v3.1/all',
+                description: 'Proxy público AllOrigins'
+            },
+            {
+                name: 'CORS Anywhere',
+                url: 'https://cors-anywhere.herokuapp.com/https://restcountries.com/v3.1/all',
+                description: 'Proxy CORS Anywhere (puede requerir activación)'
+            },
+            {
+                name: 'CodeTabs Proxy',
+                url: 'https://api.codetabs.com/v1/proxy?quest=https://restcountries.com/v3.1/all',
+                description: 'Proxy CodeTabs'
+            }
+        ];
+
+        async function testAllEndpoints() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h2>🧪 Resultados de las Pruebas</h2>';
+
+            for (const endpoint of API_ENDPOINTS) {
+                await testEndpoint(endpoint);
+            }
+        }
+
+        async function testEndpoint(endpoint) {
+            const resultsDiv = document.getElementById('results');
+            const endpointDiv = document.createElement('div');
+            endpointDiv.className = 'endpoint loading';
+            
+            endpointDiv.innerHTML = `
+                <div class="status">🔄 Probando ${endpoint.name}...</div>
+                <div class="url">${endpoint.url}</div>
+                <div>${endpoint.description}</div>
+                <div id="result-${endpoint.name.replace(/\s+/g, '')}"></div>
+            `;
+            
+            resultsDiv.appendChild(endpointDiv);
+            const resultDiv = endpointDiv.querySelector(`#result-${endpoint.name.replace(/\s+/g, '')}`);
+
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+                const response = await fetch(endpoint.url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    signal: controller.signal,
+                    mode: 'cors',
+                    cache: 'no-cache'
+                });
+
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (Array.isArray(data) && data.length > 0) {
+                        endpointDiv.className = 'endpoint success';
+                        endpointDiv.querySelector('.status').textContent = `✅ ${endpoint.name} - FUNCIONA`;
+                        resultDiv.innerHTML = `
+                            <strong>✅ Éxito!</strong><br>
+                            Países cargados: ${data.length}<br>
+                            Tiempo de respuesta: ${Date.now() - startTime}ms<br>
+                            Primer país: ${data[0].name?.common || 'N/A'}
+                        `;
+                    } else {
+                        throw new Error('Datos inválidos recibidos');
+                    }
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+            } catch (error) {
+                endpointDiv.className = 'endpoint error';
+                endpointDiv.querySelector('.status').textContent = `❌ ${endpoint.name} - FALLA`;
+                
+                let errorMessage = error.message;
+                if (error.name === 'AbortError') {
+                    errorMessage = 'Timeout (10s)';
+                } else if (error.message.includes('Failed to fetch')) {
+                    errorMessage = 'Error de red o CORS bloqueado';
+                } else if (error.message.includes('CORS')) {
+                    errorMessage = 'Error de CORS';
+                }
+                
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${errorMessage}`;
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // Auto-test al cargar la página
+        window.addEventListener('load', () => {
+            setTimeout(testAllEndpoints, 1000);
+        });
+    </script>
+</body>
+</html>

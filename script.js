@@ -18,7 +18,14 @@ const modalBody = document.getElementById('modalBody');
 const closeModal = document.getElementById('closeModal');
 
 // API Configuration
-const API_BASE_URL = 'https://restcountries.com/v3.1';
+const API_ENDPOINTS = [
+    'https://restcountries.com/v3.1',
+    'https://api.allorigins.win/raw?url=https://restcountries.com/v3.1',
+    'https://cors-anywhere.herokuapp.com/https://restcountries.com/v3.1',
+    'https://api.codetabs.com/v1/proxy?quest=https://restcountries.com/v3.1'
+];
+let currentEndpointIndex = 0;
+const API_TIMEOUT = 15000; // 15 segundos de timeout
 
 // Inicialización de la aplicación
 document.addEventListener('DOMContentLoaded', function() {
@@ -72,17 +79,30 @@ async function loadCountries() {
         showLoading(true);
         console.log('🌍 Cargando países desde la API...');
         
-        const response = await fetch(`${API_BASE_URL}/all`);
-        
-        if (!response.ok) {
-            throw new Error(`Error HTTP: ${response.status}`);
+        // Intentar con diferentes endpoints
+        for (let i = currentEndpointIndex; i < API_ENDPOINTS.length; i++) {
+            try {
+                console.log(`🔄 Intentando endpoint ${i + 1}/${API_ENDPOINTS.length}: ${API_ENDPOINTS[i]}`);
+                
+                const result = await tryApiEndpoint(API_ENDPOINTS[i]);
+                if (result) {
+                    allCountries = result;
+                    filteredCountries = [...allCountries];
+                    
+                    console.log(`✅ ${allCountries.length} países cargados desde endpoint ${i + 1}`);
+                    renderCountries(filteredCountries);
+                    hideDemoMessage();
+                    return; // Éxito, salir de la función
+                }
+            } catch (endpointError) {
+                console.warn(`❌ Endpoint ${i + 1} falló:`, endpointError.message);
+                currentEndpointIndex = i + 1; // Intentar siguiente endpoint
+                continue;
+            }
         }
         
-        allCountries = await response.json();
-        filteredCountries = [...allCountries];
-        
-        console.log(`✅ ${allCountries.length} países cargados desde la API`);
-        renderCountries(filteredCountries);
+        // Si todos los endpoints fallaron, intentar datos locales
+        throw new Error('Todos los endpoints de API fallaron');
         
     } catch (error) {
         console.error('❌ Error al cargar países desde la API:', error);
@@ -93,10 +113,74 @@ async function loadCountries() {
             await loadLocalCountries();
         } catch (localError) {
             console.error('❌ Error al cargar datos locales:', localError);
-            showError('Error al cargar los países. Verifica tu conexión a internet.');
+            console.log('🔄 Cargando países de ejemplo...');
+            loadSampleCountries();
         }
     } finally {
         showLoading(false);
+    }
+}
+
+/**
+ * Intenta conectar a un endpoint específico de la API
+ */
+async function tryApiEndpoint(baseUrl) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+    
+    try {
+        const url = baseUrl.includes('allorigins.win') || baseUrl.includes('cors-anywhere') || baseUrl.includes('codetabs') 
+            ? baseUrl + '/all' 
+            : `${baseUrl}/all`;
+            
+        console.log(`🌐 Conectando a: ${url}`);
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            signal: controller.signal,
+            mode: 'cors',
+            cache: 'no-cache',
+            credentials: 'omit'
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Validar que los datos sean válidos
+        if (!Array.isArray(data) || data.length === 0) {
+            throw new Error('Respuesta inválida de la API');
+        }
+        
+        // Verificar que los datos tengan la estructura esperada
+        const firstCountry = data[0];
+        if (!firstCountry.name || !firstCountry.flags || !firstCountry.population) {
+            throw new Error('Estructura de datos inválida');
+        }
+        
+        return data;
+        
+    } catch (fetchError) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+            throw new Error('Timeout: La solicitud tardó demasiado tiempo');
+        } else if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError')) {
+            throw new Error('Error de red: No se pudo conectar');
+        } else if (fetchError.message.includes('CORS') || fetchError.message.includes('blocked')) {
+            throw new Error('Error CORS: Acceso bloqueado');
+        } else {
+            throw new Error(fetchError.message || 'Error desconocido');
+        }
     }
 }
 
@@ -226,25 +310,8 @@ function loadSampleCountries() {
     
     console.log(`✅ ${allCountries.length} países de ejemplo cargados`);
     
-    // Mostrar mensaje informativo
-    const infoMessage = document.createElement('div');
-    infoMessage.className = 'info-message';
-    infoMessage.style.cssText = `
-        background: #e3f2fd;
-        color: #1976d2;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin-bottom: 2rem;
-        text-align: center;
-        border-left: 4px solid #1976d2;
-    `;
-    infoMessage.innerHTML = `
-        <strong>ℹ️ Modo Demo:</strong> Se están mostrando países de ejemplo porque la API no está disponible. 
-        <br>Conecta a internet para ver todos los países del mundo.
-    `;
-    
-    const main = document.querySelector('.main');
-    main.insertBefore(infoMessage, main.firstChild);
+    // Mostrar mensaje de demo
+    showDemoMessage();
     
     renderCountries(filteredCountries);
 }
@@ -343,10 +410,43 @@ async function showCountryDetail(countryCode) {
         // Obtener países fronterizos
         let borderCountries = [];
         if (country.borders && country.borders.length > 0) {
-            const borderCodes = country.borders.join(',');
-            const borderResponse = await fetch(`${API_BASE_URL}/alpha?codes=${borderCodes}`);
-            if (borderResponse.ok) {
-                borderCountries = await borderResponse.json();
+            try {
+                const borderCodes = country.borders.join(',');
+                
+                // Intentar con el primer endpoint disponible
+                const baseUrl = API_ENDPOINTS[0];
+                const url = baseUrl.includes('allorigins.win') || baseUrl.includes('cors-anywhere') || baseUrl.includes('codetabs') 
+                    ? `${baseUrl}/alpha?codes=${borderCodes}` 
+                    : `${baseUrl}/alpha?codes=${borderCodes}`;
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+                
+                const borderResponse = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    signal: controller.signal,
+                    mode: 'cors',
+                    cache: 'no-cache',
+                    credentials: 'omit'
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (borderResponse.ok) {
+                    borderCountries = await borderResponse.json();
+                }
+            } catch (error) {
+                console.warn('No se pudieron cargar los países fronterizos:', error);
+                // Usar nombres de países fronterizos desde los datos locales si están disponibles
+                borderCountries = country.borders.map(code => ({
+                    cca3: code,
+                    name: { common: code } // Fallback al código del país
+                }));
             }
         }
         
@@ -480,10 +580,132 @@ function hideError() {
 }
 
 /**
+ * Oculta el mensaje de demo
+ */
+function hideDemoMessage() {
+    const demoMessage = document.querySelector('.info-message');
+    if (demoMessage) {
+        demoMessage.remove();
+    }
+}
+
+/**
+ * Muestra el mensaje de demo
+ */
+function showDemoMessage() {
+    // Verificar si ya existe el mensaje
+    const existingMessage = document.querySelector('.info-message');
+    if (existingMessage) {
+        return;
+    }
+    
+    const infoMessage = document.createElement('div');
+    infoMessage.className = 'info-message';
+    infoMessage.style.cssText = `
+        background: #e3f2fd;
+        color: #1976d2;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 2rem;
+        text-align: center;
+        border-left: 4px solid #1976d2;
+        animation: slideIn 0.5s ease-out;
+    `;
+    infoMessage.innerHTML = `
+        <strong>ℹ️ Modo Demo:</strong> Se están mostrando países de ejemplo porque la API no está disponible. 
+        <br>Conecta a internet para ver todos los países del mundo.
+        <br><br>
+        <button onclick="retryConnection()" style="
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        ">🔄 Intentar conectar nuevamente</button>
+    `;
+    
+    const main = document.querySelector('.main');
+    main.insertBefore(infoMessage, main.firstChild);
+}
+
+/**
  * Formatea números con comas
  */
 function formatNumber(num) {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/**
+ * Intenta reconectar a la API
+ */
+async function retryConnection() {
+    console.log('🔄 Intentando reconectar a la API...');
+    
+    // Mostrar indicador de carga en el botón
+    const button = event.target;
+    const originalText = button.textContent;
+    button.textContent = '🔄 Conectando...';
+    button.disabled = true;
+    
+    try {
+        // Limpiar datos actuales
+        allCountries = [];
+        filteredCountries = [];
+        
+        // Resetear el índice de endpoints para probar desde el principio
+        currentEndpointIndex = 0;
+        
+        // Intentar cargar desde la API nuevamente
+        await loadCountries();
+        
+        console.log('✅ Reconexión exitosa');
+        
+        // Actualizar el texto del botón si la conexión fue exitosa
+        if (allCountries.length > 8) { // Más que los países de ejemplo
+            button.textContent = '✅ Conectado';
+            button.style.background = '#4caf50';
+            
+            // Remover el botón después de 2 segundos
+            setTimeout(() => {
+                const infoMessage = document.querySelector('.info-message');
+                if (infoMessage) {
+                    infoMessage.remove();
+                }
+            }, 2000);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en la reconexión:', error);
+        
+        // Restaurar botón
+        button.textContent = originalText;
+        button.disabled = false;
+        
+        // Mostrar mensaje de error temporal
+        const errorMsg = document.createElement('div');
+        errorMsg.style.cssText = `
+            background: #ffebee;
+            color: #c62828;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            border-left: 3px solid #c62828;
+        `;
+        errorMsg.textContent = `No se pudo conectar (intentado ${API_ENDPOINTS.length} endpoints). Verifica tu conexión a internet.`;
+        
+        button.parentNode.appendChild(errorMsg);
+        
+        // Remover mensaje después de 5 segundos
+        setTimeout(() => {
+            if (errorMsg.parentNode) {
+                errorMsg.remove();
+            }
+        }, 5000);
+    }
 }
 
 console.log('✅ Script JavaScript cargado correctamente');
