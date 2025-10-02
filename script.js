@@ -70,7 +70,7 @@ function setupEventListeners() {
 async function loadCountries() {
     try {
         showLoading(true);
-        console.log('🌍 Cargando países...');
+        console.log('🌍 Cargando países desde la API...');
         
         const response = await fetch(`${API_BASE_URL}/all`);
         
@@ -81,15 +81,172 @@ async function loadCountries() {
         allCountries = await response.json();
         filteredCountries = [...allCountries];
         
-        console.log(`✅ ${allCountries.length} países cargados`);
+        console.log(`✅ ${allCountries.length} países cargados desde la API`);
         renderCountries(filteredCountries);
         
     } catch (error) {
-        console.error('❌ Error al cargar países:', error);
-        showError('Error al cargar los países. Inténtalo de nuevo.');
+        console.error('❌ Error al cargar países desde la API:', error);
+        console.log('🔄 Intentando cargar datos locales...');
+        
+        // Fallback con datos locales
+        try {
+            await loadLocalCountries();
+        } catch (localError) {
+            console.error('❌ Error al cargar datos locales:', localError);
+            showError('Error al cargar los países. Verifica tu conexión a internet.');
+        }
     } finally {
         showLoading(false);
     }
+}
+
+/**
+ * Carga países desde datos locales como fallback
+ */
+async function loadLocalCountries() {
+    try {
+        const response = await fetch('./rest-countries-api-with-color-theme-switcher-master/rest-countries-api-with-color-theme-switcher-master/data.json');
+        
+        if (!response.ok) {
+            throw new Error('No se pudieron cargar los datos locales');
+        }
+        
+        allCountries = await response.json();
+        filteredCountries = [...allCountries];
+        
+        console.log(`✅ ${allCountries.length} países cargados desde datos locales`);
+        renderCountries(filteredCountries);
+        
+    } catch (error) {
+        console.error('❌ Error al cargar datos locales:', error);
+        
+        // Último recurso: datos de ejemplo
+        loadSampleCountries();
+    }
+}
+
+/**
+ * Carga países de ejemplo como último recurso
+ */
+function loadSampleCountries() {
+    console.log('🔄 Cargando países de ejemplo...');
+    
+    allCountries = [
+        {
+            name: { common: "Spain", official: "Kingdom of Spain" },
+            population: 47351567,
+            region: "Europe",
+            capital: ["Madrid"],
+            flags: { png: "https://flagcdn.com/w320/es.png" },
+            cca3: "ESP",
+            currencies: { EUR: { name: "Euro" } },
+            languages: { spa: "Spanish" },
+            borders: ["AND", "FRA", "GIB", "PRT", "MAR"]
+        },
+        {
+            name: { common: "France", official: "French Republic" },
+            population: 67391582,
+            region: "Europe",
+            capital: ["Paris"],
+            flags: { png: "https://flagcdn.com/w320/fr.png" },
+            cca3: "FRA",
+            currencies: { EUR: { name: "Euro" } },
+            languages: { fra: "French" },
+            borders: ["AND", "BEL", "DEU", "ITA", "LUX", "MCO", "ESP", "CHE"]
+        },
+        {
+            name: { common: "Germany", official: "Federal Republic of Germany" },
+            population: 83240525,
+            region: "Europe",
+            capital: ["Berlin"],
+            flags: { png: "https://flagcdn.com/w320/de.png" },
+            cca3: "DEU",
+            currencies: { EUR: { name: "Euro" } },
+            languages: { deu: "German" },
+            borders: ["AUT", "BEL", "CZE", "DNK", "FRA", "LUX", "NLD", "POL", "CHE"]
+        },
+        {
+            name: { common: "Italy", official: "Italian Republic" },
+            population: 59554023,
+            region: "Europe",
+            capital: ["Rome"],
+            flags: { png: "https://flagcdn.com/w320/it.png" },
+            cca3: "ITA",
+            currencies: { EUR: { name: "Euro" } },
+            languages: { ita: "Italian" },
+            borders: ["AUT", "FRA", "SMR", "SVN", "CHE", "VAT"]
+        },
+        {
+            name: { common: "United States", official: "United States of America" },
+            population: 329484123,
+            region: "Americas",
+            capital: ["Washington, D.C."],
+            flags: { png: "https://flagcdn.com/w320/us.png" },
+            cca3: "USA",
+            currencies: { USD: { name: "United States dollar" } },
+            languages: { eng: "English" },
+            borders: ["CAN", "MEX"]
+        },
+        {
+            name: { common: "Canada", official: "Canada" },
+            population: 38005238,
+            region: "Americas",
+            capital: ["Ottawa"],
+            flags: { png: "https://flagcdn.com/w320/ca.png" },
+            cca3: "CAN",
+            currencies: { CAD: { name: "Canadian dollar" } },
+            languages: { eng: "English", fra: "French" },
+            borders: ["USA"]
+        },
+        {
+            name: { common: "Japan", official: "Japan" },
+            population: 125836021,
+            region: "Asia",
+            capital: ["Tokyo"],
+            flags: { png: "https://flagcdn.com/w320/jp.png" },
+            cca3: "JPN",
+            currencies: { JPY: { name: "Japanese yen" } },
+            languages: { jpn: "Japanese" },
+            borders: []
+        },
+        {
+            name: { common: "China", official: "People's Republic of China" },
+            population: 1439323776,
+            region: "Asia",
+            capital: ["Beijing"],
+            flags: { png: "https://flagcdn.com/w320/cn.png" },
+            cca3: "CHN",
+            currencies: { CNY: { name: "Chinese yuan" } },
+            languages: { zho: "Chinese" },
+            borders: ["AFG", "BTN", "MMR", "HKG", "IND", "KAZ", "PRK", "KGZ", "LAO", "MAC", "MNG", "PAK", "RUS", "TJK", "VNM"]
+        }
+    ];
+    
+    filteredCountries = [...allCountries];
+    
+    console.log(`✅ ${allCountries.length} países de ejemplo cargados`);
+    
+    // Mostrar mensaje informativo
+    const infoMessage = document.createElement('div');
+    infoMessage.className = 'info-message';
+    infoMessage.style.cssText = `
+        background: #e3f2fd;
+        color: #1976d2;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 2rem;
+        text-align: center;
+        border-left: 4px solid #1976d2;
+    `;
+    infoMessage.innerHTML = `
+        <strong>ℹ️ Modo Demo:</strong> Se están mostrando países de ejemplo porque la API no está disponible. 
+        <br>Conecta a internet para ver todos los países del mundo.
+    `;
+    
+    const main = document.querySelector('.main');
+    main.insertBefore(infoMessage, main.firstChild);
+    
+    renderCountries(filteredCountries);
 }
 
 /**
@@ -148,7 +305,7 @@ function handleRegionFilter() {
  * Renderiza los países en la grilla
  */
 function renderCountries(countries) {
-    if (countries.length === 0) {
+    if (!countries || countries.length === 0) {
         showError('No se encontraron países. Intenta una búsqueda diferente.');
         return;
     }
@@ -157,7 +314,7 @@ function renderCountries(countries) {
     
     countriesGrid.innerHTML = countries.map(country => `
         <div class="country-card" onclick="showCountryDetail('${country.cca3}')">
-            <img src="${country.flags.png}" alt="${country.name.common}" class="country-flag" loading="lazy">
+            <img src="${country.flags.png}" alt="${country.name.common}" class="country-flag" loading="lazy" onerror="this.src='https://via.placeholder.com/320x200?text=Flag+Not+Found'">
             <div class="country-info">
                 <h3 class="country-name">${country.name.common}</h3>
                 <div class="country-details">
