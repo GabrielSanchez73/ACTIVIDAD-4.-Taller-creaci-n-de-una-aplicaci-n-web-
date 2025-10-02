@@ -203,7 +203,7 @@ async function tryApiEndpoint(baseUrl) {
 async function loadLocalCountries() {
     try {
         console.log('📁 Cargando datos locales...');
-        const response = await fetch('./rest-countries-api-with-color-theme-switcher-master/rest-countries-api-with-color-theme-switcher-master/data.json');
+        const response = await fetch('./data.json');
         
         if (!response.ok) {
             throw new Error(`Error HTTP: ${response.status} - No se pudieron cargar los datos locales`);
