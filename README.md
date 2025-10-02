@@ -1,14 +1,14 @@
-# 🌍 REST Countries API
+# REST Countries API
 
 Aplicación web que permite consultar información de países utilizando la REST Countries API.
 
-## 🚀 Cómo Usar
+## uso
 
 **Doble clic** en `ejecutar-servidor.bat`
 - Se abre automáticamente en `http://localhost:3000`
 - ¡Funciona perfectamente!
 
-## ✅ Funcionalidades
+## Funcionalidades
 
 - [x] Ver todos los países desde la API
 - [x] Buscar países por nombre
@@ -18,14 +18,14 @@ Aplicación web que permite consultar información de países utilizando la REST
 - [x] Modo claro/oscuro
 - [x] Diseño responsivo
 
-## 📁 Archivos
+## Archivos
 
 - `index.html` - Página principal
 - `styles.css` - Estilos CSS
 - `script.js` - Lógica JavaScript
 - `ejecutar-servidor.bat` - Script para servidor local
 
-## 🔧 Tecnologías
+## Tecnologías
 
 - HTML5
 - CSS3
@@ -35,4 +35,3 @@ Aplicación web que permite consultar información de países utilizando la REST
 
 ---
 
-**¡Listo para usar!** 🎉
