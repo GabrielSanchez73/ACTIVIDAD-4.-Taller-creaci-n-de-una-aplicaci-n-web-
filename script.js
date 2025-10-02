@@ -25,7 +25,8 @@ const API_ENDPOINTS = [
     'https://api.codetabs.com/v1/proxy?quest=https://restcountries.com/v3.1'
 ];
 let currentEndpointIndex = 0;
-const API_TIMEOUT = 15000; // 15 segundos de timeout
+const API_TIMEOUT = 10000; // 10 segundos de timeout
+const USE_LOCAL_DATA_FIRST = true; // Usar datos locales primero debido a problemas de CORS
 
 // Inicialización de la aplicación
 document.addEventListener('DOMContentLoaded', function() {
@@ -77,9 +78,22 @@ function setupEventListeners() {
 async function loadCountries() {
     try {
         showLoading(true);
-        console.log('🌍 Cargando países desde la API...');
+        console.log('🌍 Cargando países...');
         
-        // Intentar con diferentes endpoints
+        // Estrategia: Usar datos locales primero debido a problemas de CORS
+        if (USE_LOCAL_DATA_FIRST) {
+            console.log('📁 Intentando cargar datos locales primero...');
+            try {
+                await loadLocalCountries();
+                console.log('✅ Datos locales cargados exitosamente');
+                return;
+            } catch (localError) {
+                console.warn('⚠️ Datos locales fallaron, intentando API...');
+            }
+        }
+        
+        // Si los datos locales fallan, intentar API
+        console.log('🌐 Intentando conectar a la API...');
         for (let i = currentEndpointIndex; i < API_ENDPOINTS.length; i++) {
             try {
                 console.log(`🔄 Intentando endpoint ${i + 1}/${API_ENDPOINTS.length}: ${API_ENDPOINTS[i]}`);
@@ -101,14 +115,8 @@ async function loadCountries() {
             }
         }
         
-        // Si todos los endpoints fallaron, intentar datos locales
-        throw new Error('Todos los endpoints de API fallaron');
-        
-    } catch (error) {
-        console.error('❌ Error al cargar países desde la API:', error);
-        console.log('🔄 Intentando cargar datos locales...');
-        
-        // Fallback con datos locales
+        // Si todos los endpoints fallaron, intentar datos locales como fallback
+        console.log('🔄 Todos los endpoints fallaron, intentando datos locales...');
         try {
             await loadLocalCountries();
         } catch (localError) {
@@ -116,6 +124,11 @@ async function loadCountries() {
             console.log('🔄 Cargando países de ejemplo...');
             loadSampleCountries();
         }
+        
+    } catch (error) {
+        console.error('❌ Error general al cargar países:', error);
+        console.log('🔄 Cargando países de ejemplo...');
+        loadSampleCountries();
     } finally {
         showLoading(false);
     }
@@ -189,16 +202,52 @@ async function tryApiEndpoint(baseUrl) {
  */
 async function loadLocalCountries() {
     try {
+        console.log('📁 Cargando datos locales...');
         const response = await fetch('./rest-countries-api-with-color-theme-switcher-master/rest-countries-api-with-color-theme-switcher-master/data.json');
         
         if (!response.ok) {
-            throw new Error('No se pudieron cargar los datos locales');
+            throw new Error(`Error HTTP: ${response.status} - No se pudieron cargar los datos locales`);
         }
         
-        allCountries = await response.json();
+        const localData = await response.json();
+        
+        // Convertir formato de datos locales al formato esperado por la aplicación
+        allCountries = localData.map(country => ({
+            name: {
+                common: country.name,
+                official: country.name,
+                nativeName: country.nativeName ? { [country.alpha2Code]: { common: country.nativeName } } : {}
+            },
+            population: country.population,
+            region: country.region,
+            capital: country.capital ? [country.capital] : [],
+            flags: {
+                png: country.flags.png,
+                svg: country.flags.svg
+            },
+            cca3: country.alpha3Code,
+            currencies: country.currencies ? 
+                country.currencies.reduce((acc, curr) => {
+                    acc[curr.code] = { name: curr.name, symbol: curr.symbol };
+                    return acc;
+                }, {}) : {},
+            languages: country.languages ? 
+                country.languages.reduce((acc, curr) => {
+                    acc[curr.iso639_1] = curr.name;
+                    return acc;
+                }, {}) : {},
+            borders: country.borders || [],
+            subregion: country.subregion,
+            tld: country.topLevelDomain || []
+        }));
+        
         filteredCountries = [...allCountries];
         
         console.log(`✅ ${allCountries.length} países cargados desde datos locales`);
+        
+        // Mostrar mensaje informativo sobre el uso de datos locales
+        showLocalDataMessage();
+        
         renderCountries(filteredCountries);
         
     } catch (error) {
@@ -207,6 +256,42 @@ async function loadLocalCountries() {
         // Último recurso: datos de ejemplo
         loadSampleCountries();
     }
+}
+
+/**
+ * Muestra mensaje informativo sobre el uso de datos locales
+ */
+function showLocalDataMessage() {
+    const infoMessage = document.createElement('div');
+    infoMessage.className = 'info-message local-data';
+    infoMessage.style.cssText = `
+        background: #e8f5e8;
+        color: #2e7d32;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 2rem;
+        text-align: center;
+        border-left: 4px solid #4caf50;
+        animation: slideIn 0.5s ease-out;
+    `;
+    infoMessage.innerHTML = `
+        <strong>📁 Datos Locales:</strong> Se están mostrando ${allCountries.length} países desde datos locales. 
+        <br>La aplicación funciona completamente con búsqueda, filtros y detalles.
+        <br><br>
+        <button onclick="retryApiConnection()" style="
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        ">🌐 Intentar conectar a la API</button>
+    `;
+    
+    const main = document.querySelector('.main');
+    main.insertBefore(infoMessage, main.firstChild);
 }
 
 /**
@@ -639,7 +724,7 @@ function formatNumber(num) {
 }
 
 /**
- * Intenta reconectar a la API
+ * Intenta reconectar a la API (función original)
  */
 async function retryConnection() {
     console.log('🔄 Intentando reconectar a la API...');
@@ -705,6 +790,108 @@ async function retryConnection() {
                 errorMsg.remove();
             }
         }, 5000);
+    }
+}
+
+/**
+ * Intenta conectar a la API desde datos locales
+ */
+async function retryApiConnection() {
+    console.log('🌐 Intentando conectar a la API desde datos locales...');
+    
+    // Mostrar indicador de carga en el botón
+    const button = event.target;
+    const originalText = button.textContent;
+    button.textContent = '🔄 Conectando a API...';
+    button.disabled = true;
+    
+    try {
+        // Limpiar datos actuales
+        allCountries = [];
+        filteredCountries = [];
+        
+        // Cambiar temporalmente a intentar API primero
+        const originalSetting = USE_LOCAL_DATA_FIRST;
+        
+        // Resetear el índice de endpoints para probar desde el principio
+        currentEndpointIndex = 0;
+        
+        // Intentar cargar desde la API
+        console.log('🌐 Intentando conectar a la API...');
+        let apiSuccess = false;
+        
+        for (let i = 0; i < API_ENDPOINTS.length; i++) {
+            try {
+                console.log(`🔄 Intentando endpoint ${i + 1}/${API_ENDPOINTS.length}: ${API_ENDPOINTS[i]}`);
+                
+                const result = await tryApiEndpoint(API_ENDPOINTS[i]);
+                if (result) {
+                    allCountries = result;
+                    filteredCountries = [...allCountries];
+                    
+                    console.log(`✅ ${allCountries.length} países cargados desde endpoint ${i + 1}`);
+                    renderCountries(filteredCountries);
+                    hideDemoMessage();
+                    
+                    // Mostrar mensaje de éxito
+                    button.textContent = '✅ Conectado a API';
+                    button.style.background = '#4caf50';
+                    
+                    setTimeout(() => {
+                        const infoMessage = document.querySelector('.info-message');
+                        if (infoMessage) {
+                            infoMessage.remove();
+                        }
+                    }, 3000);
+                    
+                    apiSuccess = true;
+                    break;
+                }
+            } catch (endpointError) {
+                console.warn(`❌ Endpoint ${i + 1} falló:`, endpointError.message);
+                continue;
+            }
+        }
+        
+        if (!apiSuccess) {
+            throw new Error('Todos los endpoints de API fallaron');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error al conectar a la API:', error);
+        
+        // Restaurar botón y recargar datos locales
+        button.textContent = originalText;
+        button.disabled = false;
+        
+        // Mostrar mensaje de error y recargar datos locales
+        const errorMsg = document.createElement('div');
+        errorMsg.style.cssText = `
+            background: #ffebee;
+            color: #c62828;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            border-left: 3px solid #c62828;
+        `;
+        errorMsg.textContent = 'No se pudo conectar a la API. Recargando datos locales...';
+        
+        button.parentNode.appendChild(errorMsg);
+        
+        // Recargar datos locales después de 2 segundos
+        setTimeout(async () => {
+            if (errorMsg.parentNode) {
+                errorMsg.remove();
+            }
+            
+            try {
+                await loadLocalCountries();
+            } catch (localError) {
+                console.error('Error al recargar datos locales:', localError);
+                loadSampleCountries();
+            }
+        }, 2000);
     }
 }
 
