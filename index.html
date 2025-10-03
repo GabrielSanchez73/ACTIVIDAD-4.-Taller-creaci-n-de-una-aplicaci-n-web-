@@ -15,7 +15,7 @@
         <header class="header">
             <div class="header-content">
                 <h1>Where in the world?</h1>
-                <button class="theme-toggle" id="themeToggle">
+                <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
                     <span class="theme-icon">🌙</span>
                     <span class="theme-text">Dark Mode</span>
                 </button>
@@ -27,7 +27,8 @@
             <!-- Search and Filter -->
             <div class="controls">
                 <div class="search-container">
-                    <input type="text" id="searchInput" placeholder="Search for a country..." class="search-input">
+                    <label for="searchInput" class="sr-only">Search for a country</label>
+                    <input type="text" id="searchInput" placeholder="Search for a country..." class="search-input" aria-label="Search for a country">
                 </div>
                 <div class="filter-container">
                     <select id="regionFilter" class="region-filter" aria-label="Filter countries by region">
@@ -60,9 +61,9 @@
     </div>
 
     <!-- Country Detail Modal -->
-    <div class="modal" id="countryModal">
+    <div class="modal" id="countryModal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true">
         <div class="modal-content">
-            <button class="close-btn" id="closeModal">&times;</button>
+            <button class="close-btn" id="closeModal" aria-label="Close country details">&times;</button>
             <div class="modal-body" id="modalBody">
                 <!-- Country details will be loaded here -->
             </div>

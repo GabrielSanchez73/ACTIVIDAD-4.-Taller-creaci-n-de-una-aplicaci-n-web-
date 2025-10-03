@@ -537,6 +537,7 @@ async function showCountryDetail(countryCode) {
         
         renderCountryDetail(country, borderCountries);
         countryModal.classList.add('show');
+        countryModal.setAttribute('aria-hidden', 'false');
         
     } catch (error) {
         console.error('❌ Error al mostrar detalles:', error);
@@ -552,7 +553,7 @@ async function showCountryDetail(countryCode) {
 function renderCountryDetail(country, borderCountries) {
     modalBody.innerHTML = `
         <img src="${country.flags.png}" alt="${country.name.common}" class="modal-flag">
-        <h2 class="modal-title">${country.name.common}</h2>
+        <h2 class="modal-title" id="modal-title">${country.name.common}</h2>
         <div class="modal-details">
             <div>
                 <p><strong>Native Name:</strong> ${Object.values(country.name.nativeName || {})[0]?.common || 'N/A'}</p>
@@ -587,6 +588,7 @@ function renderCountryDetail(country, borderCountries) {
  */
 function closeCountryModal() {
     countryModal.classList.remove('show');
+    countryModal.setAttribute('aria-hidden', 'true');
 }
 
 /**
