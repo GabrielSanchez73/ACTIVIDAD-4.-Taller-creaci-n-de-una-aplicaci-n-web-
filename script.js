@@ -468,7 +468,7 @@ function renderCountries(countries) {
         <div class="country-card" onclick="showCountryDetail('${country.cca3}')">
             <img src="${country.flags.png}" alt="${country.name.common}" class="country-flag" loading="lazy" onerror="this.src='https://via.placeholder.com/320x200?text=Flag+Not+Found'">
             <div class="country-info">
-                <h3 class="country-name">${country.name.common}</h3>
+                <h2 class="country-name">${country.name.common}</h2>
                 <div class="country-details">
                     <p><strong>Population:</strong> ${formatNumber(country.population)}</p>
                     <p><strong>Region:</strong> ${country.region}</p>
